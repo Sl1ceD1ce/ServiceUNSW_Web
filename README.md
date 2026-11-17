@@ -86,7 +86,7 @@ professor see "Teaching - Tutor" first, followed by "Teaching - Professor".
 
 User records are seeded from [server/seed/users.json](server/seed/users.json). Each user
 has an ID, a name, and a roles array supporting `student`, `tutor`, and
-`professor`. The five sample users are Kevin (student), Alex (tutor), Jordan
+`professor`. The five sample users are Peter (student), Alex (tutor), Jordan
 (professor), Sam (tutor and professor), and Taylor (tutor and student).
 The sidebar and profile read the currently signed-in user.
 These are fictional sample profiles, including contact details, degree progress
@@ -109,7 +109,7 @@ The `/sign-in` page requires a test zID and zPass. Every sample user's zPass is
 
 | User | zID | Type |
 | --- | --- | --- |
-| Kevin | z2460811 | Student |
+| Peter | z2460811 | Student |
 | Alex | z2460812 | Tutor |
 | Jordan | z2460813 | Professor |
 | Sam | z2460814 | Tutor, Professor |
