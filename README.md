@@ -152,6 +152,8 @@ both pages.
 Student wellbeing opens `https://www.unsw.edu.au/student/support` in a new tab
 on both pages.
 IT help opens `https://www.unsw.edu.au/myit` in a new tab on both pages.
+Makerspace opens `https://www.making.unsw.edu.au/` in a new tab on both pages
+for booking machines.
 Manage favourites opens a
 selection dialog. Choose zero to four services and save to update Home.
 Cancel leaves the saved selection unchanged. At four selections, deselect a

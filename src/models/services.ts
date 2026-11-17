@@ -1,4 +1,4 @@
-export type ServiceIcon = 'book' | 'library' | 'play' | 'search' | 'plan' | 'clipboard' | 'file' | 'mail' | 'map' | 'monitor' | 'heart'
+export type ServiceIcon = 'book' | 'library' | 'play' | 'search' | 'plan' | 'clipboard' | 'wrench' | 'file' | 'mail' | 'map' | 'monitor' | 'heart'
 export type ServiceTone = 'blue' | 'green' | 'purple' | 'yellow'
 
 export interface QuickLinkService {

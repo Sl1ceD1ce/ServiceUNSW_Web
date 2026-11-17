@@ -62,14 +62,6 @@
       "url": "https://my.unsw.edu.au/portal/portal/student.xml"
     },
     {
-      "id": "enrolment",
-      "name": "Enrolment",
-      "description": "Manage courses and review your enrolment.",
-      "group": "admin",
-      "icon": "clipboard",
-      "tone": "blue"
-    },
-    {
       "id": "myplan",
       "name": "myPlan",
       "description": "Plan your degree pathway.",
@@ -84,6 +76,15 @@
       "group": "admin",
       "icon": "file",
       "tone": "purple"
+    },
+    {
+      "id": "makerspace",
+      "name": "Makerspace",
+      "description": "Book 3D printers, laser cutters and other machines.",
+      "group": "admin",
+      "icon": "wrench",
+      "tone": "blue",
+      "url": "https://www.making.unsw.edu.au/"
     },
     {
       "id": "email",
