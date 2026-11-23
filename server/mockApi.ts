@@ -11,6 +11,7 @@ type Table = Record<string, unknown>
 const MAX_BODY_BYTES = 100_000
 const MAX_FAVOURITES = 4
 const USER_ID_PATTERN = /^[a-z0-9-]{1,64}$/
+const ZID_PATTERN = /^z[0-9]{7}$/
 const SERVICE_ID_PATTERN = /^[a-z0-9-]{1,64}$/
 const LECTURE_KEY_PATTERN = /^[A-Z]{4}\d{4}-\d{4}-\d{2}-\d{2}$/
 
@@ -155,9 +156,9 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 interface StoredUser {
   id: string
   universityId: string
-  zPass: string
+  zPass?: string
   roles: string[]
-  degree?: { name: string }
+  degree?: { name: string; [field: string]: unknown }
   teachingAppointments: { courseCode: string; courseName: string; role: string; coordinator: string }[]
   [field: string]: unknown
 }
@@ -359,15 +360,45 @@ export function mockApiPlugin({ seedDirectory, dataDirectory }: { seedDirectory:
     return users[userId]
   }
 
-  async function signIn(body: unknown) {
-    if (!isRecord(body) || typeof body.zid !== 'string' || typeof body.zPass !== 'string') {
-      throw new ValidationError('Enter your zID and zPass.')
-    }
-    const zid = body.zid.trim().toLowerCase()
+  // Maps an account verified by the ServiceUNSW backend to a portal profile.
+  // Seeded demo profiles are matched by zID so their roles carry over; any other
+  // zID gets a student profile built from the backend details. Demo only: this
+  // trusts the browser's copy of the backend response and checks no JWT.
+  async function linkProfile(body: unknown) {
+    if (!isRecord(body)) throw new ValidationError('Account details are required.')
+    const zId = requireText(body.zId, 'zId', 8).toLowerCase()
+    if (!ZID_PATTERN.test(zId)) throw new ValidationError('zId must be z followed by seven digits.')
+    const firstName = requireText(body.firstName, 'firstName', 100)
+    const lastName = requireText(body.lastName, 'lastName', 100)
+    const degree = requireText(body.degree, 'degree', 191)
+    const fullName = `${firstName} ${lastName}`
+
     const users = await readJson<Record<string, StoredUser>>('users.json')
-    const user = Object.values(users).find((candidate) =>
-      candidate.universityId === zid && candidate.zPass === body.zPass)
-    if (!user) throw new ApiError(401, 'Incorrect zID or zPass. Please try again.')
+    const existing = Object.values(users).find((candidate) => candidate.universityId === zId)
+    const user = await updateRecord<StoredUser>('users.json', existing?.id ?? zId, (current) => {
+      const base: StoredUser = isRecord(current) ? current as StoredUser : {
+        id: zId,
+        universityId: zId,
+        email: `${zId}@ad.unsw.edu.au`,
+        school: 'UNSW Sydney',
+        roles: ['student'],
+        degree: {
+          name: degree,
+          studyStage: 'Full-time',
+          currentTerm: 'Term 3, 2026',
+          completedUoc: 0,
+          requiredUoc: 144,
+        },
+        teachingAppointments: [],
+      }
+      const { zPass: _zPass, ...rest } = base
+      return {
+        ...rest,
+        name: firstName,
+        fullName,
+        ...(rest.degree ? { degree: { ...rest.degree, name: degree } } : {}),
+      } as StoredUser
+    })
     return toPublicUser(user)
   }
 
@@ -564,9 +595,9 @@ export function mockApiPlugin({ seedDirectory, dataDirectory }: { seedDirectory:
       if (!methods.includes(method)) throw new ApiError(405, 'Method not allowed.')
     }
 
-    if (segments[0] === 'auth' && segments[1] === 'sign-in' && segments.length === 2) {
+    if (segments[0] === 'profiles' && segments.length === 1) {
       allow('POST')
-      return signIn(await readBody(req))
+      return linkProfile(await readBody(req))
     }
 
     if (segments[0] === 'users' && segments[1] && segments[2] === 'timesheets' && segments.length <= 5) {
@@ -623,7 +654,7 @@ export function mockApiPlugin({ seedDirectory, dataDirectory }: { seedDirectory:
       sendJson(res, 400, { error: 'Invalid mock API path.' })
       return
     }
-    if (segments[0] !== 'auth' && segments[0] !== 'users') {
+    if (segments[0] !== 'profiles' && segments[0] !== 'users') {
       next()
       return
     }

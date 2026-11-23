@@ -5,7 +5,6 @@
     "fullName": "Peter Lin",
     "email": "z2460811@ad.unsw.edu.au",
     "universityId": "z2460811",
-    "zPass": "Password",
     "school": "School of Computer Science and Engineering",
     "roles": [
       "student"
@@ -25,7 +24,6 @@
     "fullName": "Alex Morgan",
     "email": "z2460812@ad.unsw.edu.au",
     "universityId": "z2460812",
-    "zPass": "Password",
     "school": "School of Computer Science and Engineering",
     "roles": [
       "tutor"
@@ -46,7 +44,6 @@
     "fullName": "Jordan Lee",
     "email": "z2460813@ad.unsw.edu.au",
     "universityId": "z2460813",
-    "zPass": "Password",
     "school": "School of Computer Science and Engineering",
     "roles": [
       "professor"
@@ -67,7 +64,6 @@
     "fullName": "Sam Patel",
     "email": "z2460814@ad.unsw.edu.au",
     "universityId": "z2460814",
-    "zPass": "Password",
     "school": "School of Computer Science and Engineering",
     "roles": [
       "tutor",
@@ -96,7 +92,6 @@
     "fullName": "Taylor Nguyen",
     "email": "z2460815@ad.unsw.edu.au",
     "universityId": "z2460815",
-    "zPass": "Password",
     "school": "School of Psychology",
     "roles": [
       "tutor",

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { ApiError, fetchUser } from './api/mockDatabase'
-import { clearSession, readSessionUserId, saveSession } from './auth/session'
+import { BackendError, fetchMe } from './api/backend'
+import { linkProfile } from './api/mockDatabase'
+import { clearSession, readSessionToken, saveSessionToken } from './auth/session'
 import type { User } from './models/users'
 import { useCalendarData } from './calendar/useCalendarData'
 import { useFavourites } from './hooks/useFavourites'
@@ -17,13 +18,18 @@ import QuickLinks from './pages/QuickLinks'
 import SignIn from './pages/SignIn'
 import './App.css'
 
+/** Loads the backend account for a JWT, then the matching portal profile. */
+async function loadUser(token: string): Promise<User> {
+  return linkProfile(await fetchMe(token))
+}
+
 function App() {
   const navigate = useNavigate()
   const [session, setSession] = useState<{ user: User | null; restoring: boolean; error: string }>(() => {
     try {
-      return { user: null, restoring: readSessionUserId() !== null, error: '' }
+      return { user: null, restoring: readSessionToken() !== null, error: '' }
     } catch (error) {
-      console.error('Unable to restore demo session:', error)
+      console.error('Unable to restore session:', error)
       return { user: null, restoring: false, error: 'Unable to restore your session. Please allow browser session storage and sign in again.' }
     }
   })
@@ -31,25 +37,33 @@ function App() {
   useEffect(() => {
     if (!session.restoring) return
     let cancelled = false
-    const userId = readSessionUserId()
-    if (!userId) return
-    fetchUser(userId)
+    const token = readSessionToken()
+    if (!token) return
+    loadUser(token)
       .then((user) => {
         if (!cancelled) setSession({ user, restoring: false, error: '' })
       })
       .catch((error: unknown) => {
-        console.error('Unable to restore demo session:', error)
+        console.error('Unable to restore session:', error)
         if (cancelled) return
-        if (error instanceof ApiError && error.status === 404) {
-          try { clearSession() } catch { /* sign-in will overwrite the stale session */ }
+        const expired = error instanceof BackendError && (error.status === 401 || error.status === 403 || error.status === 404)
+        if (expired) {
+          try { clearSession() } catch { /* sign-in will overwrite the stale token */ }
         }
-        setSession({ user: null, restoring: false, error: 'Unable to restore your session. Please sign in again.' })
+        setSession({
+          user: null,
+          restoring: false,
+          error: expired ? 'Your session has ended. Please sign in again.' : 'Unable to restore your session. Please sign in again.',
+        })
       })
     return () => { cancelled = true }
   }, [session.restoring])
 
-  function signIn(user: User) {
-    saveSession(user)
+  // Called by the sign-in page with a JWT from login or email verification.
+  // Throws so the sign-in page can show what went wrong.
+  async function authenticate(token: string): Promise<void> {
+    const user = await loadUser(token)
+    saveSessionToken(token)
     setSession({ user, restoring: false, error: '' })
     navigate('/home', { replace: true })
   }
@@ -59,8 +73,8 @@ function App() {
     try {
       clearSession()
     } catch (error) {
-      console.error('Unable to clear demo session:', error)
-      message = 'Browser session storage could not be cleared. Close this tab to fully end your demo session.'
+      console.error('Unable to clear session:', error)
+      message = 'Browser session storage could not be cleared. Close this tab to fully end your session.'
     }
     setSession({ user: null, restoring: false, error: message })
     navigate('/sign-in', { replace: true })
@@ -73,7 +87,7 @@ function App() {
   if (!user) {
     return (
       <Routes>
-        <Route path="/sign-in" element={<SignIn onSignIn={signIn} sessionError={session.error} />} />
+        <Route path="/sign-in" element={<SignIn onAuthenticated={authenticate} sessionError={session.error} />} />
         <Route path="*" element={<Navigate to="/sign-in" replace />} />
       </Routes>
     )

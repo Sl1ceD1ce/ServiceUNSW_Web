@@ -100,3 +100,99 @@
   border-top: 1px solid #e7e8e0;
   font-size: 0.75rem;
 }
+
+.sign-in-notice {
+  margin: 0 0 0.75rem;
+  color: #2a5ca4;
+  font-size: 0.875rem;
+}
+
+.sign-in-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.sign-in-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+@media (max-width: 420px) {
+  .sign-in-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+.sign-in-rules {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: -0.4rem 0 0.75rem;
+  padding: 0;
+  list-style: none;
+  color: #777c70;
+  font-size: 0.75rem;
+}
+
+.sign-in-rules li.met {
+  color: #2f7a3b;
+}
+
+.sign-in-card .sign-in-code {
+  font-size: 1.5rem;
+  letter-spacing: 0.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.sign-in-card button.sign-in-secondary {
+  border: 1px solid #b5b8a8;
+  background: white;
+}
+
+.sign-in-card button.sign-in-secondary:hover:not(:disabled) {
+  background: #f6f6f2;
+}
+
+.sign-in-card button.sign-in-secondary:disabled {
+  cursor: default;
+}
+
+.sign-in-switch {
+  margin-top: 1.25rem;
+  font-size: 0.875rem;
+  color: #777c70;
+}
+
+.sign-in-switch p {
+  margin: 0.25rem 0;
+}
+
+.sign-in-card button.sign-in-link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #2a5ca4;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sign-in-card button.sign-in-link:hover {
+  background: none;
+  color: #1d4380;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
