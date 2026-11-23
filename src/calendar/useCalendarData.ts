@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { fetchCalendarEvents, readUserRecord, writeUserRecord } from '../api/mockDatabase'
+import { BackendError, fetchCalendarFeed } from '../api/backend'
+import { getCalendarEvents, readUserRecord, writeUserRecord } from '../api/portalData'
+import { readSessionToken } from '../auth/session'
 import type { CalendarEvent } from '../models/calendar'
+import type { User } from '../models/users'
 import { parseIcs } from './events'
 
 interface StoredPersonalEvent {
@@ -18,24 +21,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function parseCalendarSettings(value: unknown): string {
   if (value === null) return ''
   if (!isRecord(value) || typeof value.icsUrl !== 'string') {
-    throw new Error('Calendar settings returned by the mock API are invalid.')
+    throw new Error('Calendar settings saved in your account are invalid.')
   }
   return value.icsUrl
 }
 
 function parsePersonalEvents(value: unknown): CalendarEvent[] {
   if (value === null) return []
-  if (!Array.isArray(value)) throw new Error('Personal events returned by the mock API are invalid.')
+  if (!Array.isArray(value)) throw new Error('Personal events saved in your account are invalid.')
   return value.map((event) => {
     if (!isRecord(event) || typeof event.uid !== 'string' || typeof event.summary !== 'string' ||
       typeof event.start !== 'string' || (event.end !== undefined && typeof event.end !== 'string') ||
       (event.location !== undefined && typeof event.location !== 'string')) {
-      throw new Error('A personal event returned by the mock API is invalid.')
+      throw new Error('A personal event saved in your account is invalid.')
     }
     const start = new Date(event.start)
     const end = typeof event.end === 'string' ? new Date(event.end) : undefined
     if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) {
-      throw new Error('A personal event returned by the mock API has an invalid date.')
+      throw new Error('A personal event saved in your account has an invalid date.')
     }
     return {
       uid: event.uid,
@@ -60,7 +63,36 @@ function toStoredPersonalEvent(event: CalendarEvent): StoredPersonalEvent {
   }
 }
 
-export function useCalendarData(userId: string) {
+// Most calendar providers block cross-origin requests, so feeds go through a
+// proxy: the Vite /api/ics-proxy under `npm run dev`, and the backend's
+// /v1/calendar/ics in built (hosted) apps. If the deployed backend predates
+// that route (404), fall back to fetching the feed directly, which only works
+// for feeds that send CORS headers.
+async function fetchIcsFeed(icsUrl: string): Promise<string> {
+  if (import.meta.env.DEV) {
+    const response = await fetch(`/api/ics-proxy?url=${encodeURIComponent(icsUrl)}`)
+    if (!response.ok) throw new Error(`Failed to load calendar (${response.status})`)
+    return response.text()
+  }
+  const token = readSessionToken()
+  if (!token) throw new Error('Sign in again to load your calendar.')
+  try {
+    return await fetchCalendarFeed(token, icsUrl)
+  } catch (error) {
+    if (!(error instanceof BackendError && error.status === 404)) throw error
+  }
+  let response: Response
+  try {
+    response = await fetch(icsUrl.replace(/^webcal:\/\//i, 'https://'))
+  } catch {
+    throw new Error('This calendar feed does not allow loading from the browser, and the ServiceUNSW service has no iCal proxy yet.')
+  }
+  if (!response.ok) throw new Error(`Failed to load calendar (${response.status})`)
+  return response.text()
+}
+
+export function useCalendarData(user: User) {
+  const userId = user.id
   const [icsUrl, setIcsUrl] = useState('')
   const [feedRevision, setFeedRevision] = useState(0)
   const [importedEvents, setImportedEvents] = useState<CalendarEvent[]>([])
@@ -70,8 +102,15 @@ export function useCalendarData(userId: string) {
   const [personalEventsError, setPersonalEventsError] = useState<string | null>(null)
   const [personalEventsReady, setPersonalEventsReady] = useState(false)
   const [today] = useState(() => new Date())
-  const [serverEvents, setServerEvents] = useState<CalendarEvent[]>([])
-  const [serverEventsError, setServerEventsError] = useState<string | null>(null)
+  // Demo deadlines, campus events and (for professors) lectures are bundled with the app.
+  const [{ serverEvents, serverEventsError }] = useState(() => {
+    try {
+      return { serverEvents: getCalendarEvents(user, today), serverEventsError: null }
+    } catch (eventsError) {
+      console.error('Unable to build calendar events:', eventsError)
+      return { serverEvents: [], serverEventsError: 'Unable to load university and lecture events.' }
+    }
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -85,21 +124,8 @@ export function useCalendarData(userId: string) {
       .catch((settingsError: unknown) => {
         console.error('Unable to read calendar settings:', settingsError)
         if (cancelled) return
-        setError('Unable to read saved calendar settings from the mock database.')
+        setError('Unable to read saved calendar settings from your ServiceUNSW account.')
         setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [userId])
-
-  useEffect(() => {
-    let cancelled = false
-    fetchCalendarEvents(userId)
-      .then((events) => {
-        if (!cancelled) setServerEvents(events)
-      })
-      .catch((eventsError: unknown) => {
-        console.error('Unable to read calendar events:', eventsError)
-        if (!cancelled) setServerEventsError('Unable to load university and lecture events from the mock API.')
       })
     return () => { cancelled = true }
   }, [userId])
@@ -114,7 +140,7 @@ export function useCalendarData(userId: string) {
       })
       .catch((eventsError: unknown) => {
         console.error('Unable to read personal events:', eventsError)
-        if (!cancelled) setPersonalEventsError('Unable to load personal events from the mock database.')
+        if (!cancelled) setPersonalEventsError('Unable to load personal events from your ServiceUNSW account.')
       })
     return () => { cancelled = true }
   }, [userId])
@@ -122,11 +148,7 @@ export function useCalendarData(userId: string) {
   useEffect(() => {
     if (!icsUrl) return
     let cancelled = false
-    fetch(`/api/ics-proxy?url=${encodeURIComponent(icsUrl)}`)
-      .then((response) => {
-        if (!response.ok) throw new Error(`Failed to load calendar (${response.status})`)
-        return response.text()
-      })
+    fetchIcsFeed(icsUrl)
       .then((text) => {
         if (!cancelled) setImportedEvents(parseIcs(text))
       })

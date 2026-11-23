@@ -23,5 +23,5 @@ dist-ssr
 *.sln
 *.sw?
 
-# Local mock database (seeded from server/seed on dev/preview start)
+# Old local mock database (no longer used; safe to delete)
 .mockdb

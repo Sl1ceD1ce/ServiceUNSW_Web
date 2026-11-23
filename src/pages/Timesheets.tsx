@@ -269,7 +269,7 @@ function EntryForm({ data, period, editing, saving, error, onCreate, onUpdate, o
 }
 
 function Timesheets({ user }: { user: User }) {
-  const timesheets = useTimesheets(user.id)
+  const timesheets = useTimesheets(user)
   const { data } = timesheets
   const [selectedPeriodStart, setSelectedPeriodStart] = useState('')
   const [activityFilter, setActivityFilter] = useState('all')

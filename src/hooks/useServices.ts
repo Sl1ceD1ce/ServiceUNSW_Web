@@ -1,31 +1,11 @@
-import { useEffect, useState } from 'react'
-import { fetchServiceCatalogue } from '../api/mockDatabase'
+import { useMemo } from 'react'
+import { getServiceCatalogue } from '../api/portalData'
 import type { ServiceCatalogue } from '../models/services'
+import type { User } from '../models/users'
 
-export function useServices(userId: string) {
-  const [state, setState] = useState<ServiceCatalogue & { loading: boolean; error: string }>({
-    groups: [],
-    services: [],
-    loading: true,
-    error: '',
-  })
-
-  useEffect(() => {
-    let cancelled = false
-    fetchServiceCatalogue(userId)
-      .then((catalogue) => {
-        if (!cancelled) setState({ ...catalogue, loading: false, error: '' })
-      })
-      .catch((error: unknown) => {
-        console.error('Unable to load services:', error)
-        if (!cancelled) {
-          setState({ groups: [], services: [], loading: false, error: 'Unable to load university services. Refresh the page and try again.' })
-        }
-      })
-    return () => { cancelled = true }
-  }, [userId])
-
-  return state
+/** The service catalogue is bundled with the app, so it is ready immediately. */
+export function useServices(user: User): ServiceCatalogue & { loading: boolean; error: string } {
+  return useMemo(() => ({ ...getServiceCatalogue(user), loading: false, error: '' }), [user])
 }
 
 export type ServicesState = ReturnType<typeof useServices>

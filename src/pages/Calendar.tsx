@@ -420,7 +420,7 @@ function Calendar({ calendar }: { calendar: CalendarData }) {
             <label htmlFor="ical-url">iCal link</label>
             <input id="ical-url" type="text" inputMode="url" className="calendar-input"
               placeholder="https://… or webcal://…" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-            <p className="calendar-status">Leave blank to disconnect. The link is saved to your account in the mock database.</p>
+            <p className="calendar-status">Leave blank to disconnect. The link is saved to your ServiceUNSW account.</p>
             {formError && <p className="calendar-error" role="alert">{formError}</p>}
             <button type="submit" className="calendar-submit" disabled={saving}>{saving ? 'Saving…' : 'Save settings'}</button>
           </form>
@@ -437,7 +437,7 @@ function Calendar({ calendar }: { calendar: CalendarData }) {
             <input className="calendar-input" id="event-end" name="end" type="datetime-local" />
             <label htmlFor="event-location">Location (optional)</label>
             <input className="calendar-input" id="event-location" name="location" />
-            <p className="calendar-status">Personal events are saved to your account in the mock database.</p>
+            <p className="calendar-status">Personal events are saved to your ServiceUNSW account.</p>
             {formError && <p className="calendar-error" role="alert">{formError}</p>}
             <button type="submit" className="calendar-submit" disabled={saving}>{saving ? 'Saving…' : 'Add event'}</button>
           </form>

@@ -34,39 +34,83 @@ This prints a local URL (usually `http://localhost:5173`) — open it in your br
 - `npm run preview` — locally preview the production build
 - `npm run lint` — run Oxlint over the codebase
 
-## Mock database
+## Portal data
 
-Accounts and sign-in use the real backend (see *Sign-in and email
-verification*). Portal data still comes from a simulated API
-(`/api/profiles` and `/api/users/:userId/...`) served by
-[server/mockApi.ts](server/mockApi.ts) inside the Vite dev and preview servers.
+There is no mock server: everything the portal shows comes either from the
+ServiceUNSW backend or from data bundled into the build, so `npm run build`
+output runs as plain static files.
 
-- `server/seed/` — committed starting data (users, services, lecture schedule,
-  demo calendar events, timesheet settings, starting teaching notes and
-  timesheet entries, and empty user tables).
-- `.mockdb/` — the local mock database the API reads and writes. It is
-  git-ignored because it changes as each person tests the app. On server
-  start, any missing table is copied from `server/seed/`; existing data is
-  never overwritten.
+- **Bundled catalogue data** lives in [src/data/](src/data/): seeded role
+  profiles (`users.json`), the service catalogue, the lecture schedule, demo
+  calendar events, timesheet settings, and the starting teaching notes and
+  timesheet entries for the seeded profiles.
+- **Per-user state** is saved in the backend's key-value store
+  (`GET/PATCH/DELETE /v1/users/me/data`, JWT bearer) under `portal.*` keys:
+  favourites, calendar settings, personal events, lecture checklists, the
+  teaching note and timesheet entries. A record that was never saved falls back
+  to its starting value in `src/data/`. It follows the account, not the browser.
 
-To reset your local data, stop the server and delete `.mockdb/`. To change the
-starting data for everyone, edit `server/seed/`; existing `.mockdb/` folders
-keep their current files until deleted. A static build without the Vite server
-has no API.
+[src/api/portalData.ts](src/api/portalData.ts) builds the profile, catalogue,
+lecture plan, calendar events and timesheets, and validates every save in the
+browser (favourites limit, iCal URL, timesheet future dates, closed periods,
+courses, activities and overlaps, draft-only edits). This is a demo: the backend
+stores whatever a signed-in client sends.
+
+[src/api/userData.ts](src/api/userData.ts) talks to the store. Backends before
+the `20261123000000_user_data_value_mediumtext` migration keep each value in a
+`VARCHAR(191)` column, so a record larger than about 180 characters is split
+across a header key and `portal.<name>#<n>` chunk keys, all written in one
+PATCH. Once every deployed backend has that migration, `MAX_STORED_CHARS` in
+userData.ts can be raised so records are stored whole (existing chunked records
+still read correctly). Each page load fetches the account's data once. To reset an account's
+portal data, `DELETE /v1/users/me/data` with its token (this removes all of
+its keys). Records are capped (200 personal events, 300 timesheet entries,
+about 90 kB per save) to stay under the backend's 100 kB request limit.
+
+Run `node --test tests/user-data.test.mjs` for the store and validation tests.
+They use an in-memory fake backend by default; set `USER_DATA_TEST_API` and
+`USER_DATA_TEST_TOKEN` to run them against a real backend with a throwaway
+verified account (its `portal.*` keys are overwritten).
+
+## Hosting on AWS
+
+The Development site is `https://dev.serviceunsw.com` (private S3 + CloudFront,
+defined in `ServiceUNSW-infra`). To deploy:
+
+```bash
+npm run build
+```
+
+Then run `scripts/publish-frontend.ts` from `ServiceUNSW-infra`. It uploads
+`dist/` and writes `/runtime-config.json` with `apiBaseUrl` (the API Gateway
+URL, `https://api.dev.serviceunsw.com` in dev). The app needs nothing else: it
+reads that file on load and sends every `/v1` request straight to API Gateway.
+
+- **CORS.** API Gateway allows the frontend's own origin
+  (`allowedOrigins: [frontend.url]` in `ServiceUNSW-infra/lib/api-stack.ts`),
+  which is `https://dev.serviceunsw.com` in dev. `npm run dev` and
+  `npm run preview` need no CORS, because Vite proxies `/v1`. Only a local
+  static server whose `runtime-config.json` points at API Gateway directly
+  would need its `http://localhost:<port>` origin added to `allowedOrigins`.
+- **Routes.** A CloudFront function rewrites extensionless paths such as
+  `/calendar` to `/index.html`, so deep links and refreshes work.
+- **iCal feeds.** `npm run dev` fetches feeds through the Vite
+  `/api/ics-proxy`. The built app uses the backend's `GET /v1/calendar/ics`
+  proxy (JWT bearer). If the deployed backend doesn't have that route yet (404),
+  it fetches the feed directly from the browser, which only works for feeds
+  that send CORS headers.
 
 ## Project Structure
 
 ```
-server/
-  mockApi.ts           # Simulated API backed by the local mock database
-  seed/                # Committed starting data for the mock database
 src/
   App.tsx              # Route definitions
-  api/                 # Backend client (backend.ts) and simulated API client
+  api/                 # Backend client, key-value store and portal data (see Portal data)
   auth/                # JWT and pending-registration session storage
   calendar/            # Shared event parsing, recurrence and state
   components/          # Shared UI components (Sidebar, ...)
-  hooks/               # API-backed state (favourites, services, lectures, timesheets)
+  data/                # Bundled catalogue and starting data
+  hooks/               # Portal state (favourites, services, lectures, timesheets)
   models/              # Shared types and helpers
   pages/               # Route pages (Home, Calendar, QuickLinks, Lectures, Timesheets, Profile, SignIn)
 ```
@@ -85,7 +129,7 @@ professor see "Teaching - Tutor" first, followed by "Teaching - Professor".
 
 ### User data
 
-User records are seeded from [server/seed/users.json](server/seed/users.json). Each user
+Seeded profiles are bundled from [src/data/users.json](src/data/users.json). Each user
 has an ID, a name, and a roles array supporting `student`, `tutor`, and
 `professor`. The five sample users are Peter (student), Alex (tutor), Jordan
 (professor), Sam (tutor and professor), and Taylor (tutor and student).
@@ -106,7 +150,7 @@ in this workspace.
 ### Sign-in and email verification
 
 Accounts live in the ServiceUNSW backend (`/Users/jason/UniStuff/ServiceUNSW`,
-API under `/v1`), not in the mock database. [src/api/backend.ts](src/api/backend.ts)
+API under `/v1`). [src/api/backend.ts](src/api/backend.ts)
 is the client; [src/pages/SignIn.tsx](src/pages/SignIn.tsx) has three views:
 
 1. **Sign in** posts `{zId, password}` to `/v1/auth/login` and receives a JWT.
@@ -127,9 +171,8 @@ sessionStorage, so a refresh keeps them and closing the tab ends them. Passwords
 and codes are never stored. On load the app calls `/v1/users/me`; a 401/403
 clears the token and returns to sign-in. Sign out clears the token.
 
-After sign-in the browser posts the `/users/me` details to the mock
-`POST /api/profiles`, which returns the portal profile used by every other page.
-A zID matching a seeded profile (below) keeps that profile's roles and teaching
+After sign-in the browser maps the `/users/me` details to the portal profile
+used by every other page (`linkProfile` in `src/api/portalData.ts`). A zID matching a seeded profile (below) keeps that profile's roles and teaching
 appointments; any other zID gets a new student profile. Names and degree come
 from the backend.
 
@@ -153,8 +196,8 @@ reach recipients verified in ServiceUNSW-infra (`sesSandboxRecipients`).
 Registering any other zID gets 503 "Email delivery failed". Per-recipient and
 per-IP send limits apply (see the backend's `docs/registration-verification.md`).
 
-This is for demonstration only: it is not UNSW identity. The profile bridge
-trusts the browser and checks no JWT, and the other portal data is still mock.
+This is for demonstration only: it is not UNSW identity. Roles come from the
+bundled seed profiles, not from the backend.
 
 ### Home
 
@@ -189,11 +232,11 @@ selection dialog. Choose zero to four services and save to update Home.
 Cancel leaves the saved selection unchanged. At four selections, deselect a
 service before choosing another.
 
-Favourites are saved in the mock database separately for each signed-in user
+Favourites are saved in the backend separately for each signed-in user
 and survive refreshes and sign-out. New users default to Moodle, myUNSW, Library
 and Student email. Service cards on both Home and Quick links
 share the same appearance, link behaviour and favourite marker. Storage errors
-are displayed explicitly. The shared catalogue is seeded from `server/seed/services.json`.
+are displayed explicitly. The shared catalogue is bundled from `src/data/services.json`.
 MyPlan replaces Fees & payments and describes the signed-in student's degree
 pathway on both pages. Users without a student degree see a generic description.
 Existing Fees & payments favourites are migrated to MyPlan.
@@ -202,21 +245,21 @@ Existing Fees & payments favourites are migrated to MyPlan.
 
 Professors see a Lectures page under Teaching in the sidebar. It lists two
 lectures per week for each professor course between 26 October and 20 November
-2026, based on [server/seed/lectureSchedule.json](server/seed/lectureSchedule.json).
+2026, based on [src/data/lectureSchedule.json](src/data/lectureSchedule.json).
 Each lecture has a preparation checklist: no items is Not planned, unchecked
 items is Planned, some checked is In progress and all checked is Ready.
-Checklists and each professor's teaching note are saved in the mock database.
+Checklists and each professor's teaching note are saved in the backend.
 
 ### Timesheets
 
 Tutors see a Timesheets page under Teaching in the sidebar for recording and
 submitting teaching hours. Hours are grouped into fortnightly reporting periods
-configured in [server/seed/timesheetSettings.json](server/seed/timesheetSettings.json);
+configured in [src/data/timesheetSettings.json](src/data/timesheetSettings.json);
 the current and previous periods are open and older periods are read-only.
 In the **Record hours** form, a tutor can submit an entry for approval
 directly or save it as a draft. Drafts can be opened with the pen button in
 Your entries to edit, delete or submit them; submitted entries are read-only.
-The API rejects future dates, closed periods, courses the tutor does
+The app rejects future dates, closed periods, courses the tutor does
 not teach and overlapping times. **Export CSV** downloads the selected period.
 
 ### Calendar
@@ -225,19 +268,19 @@ The calendar includes month navigation, a Today button, a selected-day agenda
 and a next-deadline card. My timetable, Deadlines and Campus events can each be
 toggled independently. Professors also see their lecture sessions under a
 Lectures filter. Demo data in
-[server/seed/demoCalendarEvents.json](server/seed/demoCalendarEvents.json)
+[src/data/demoCalendarEvents.json](src/data/demoCalendarEvents.json)
 includes three assignment deadlines and three illustrative DevSoc events,
 dated relative to the day the calendar is opened. These are not actual
 university deadlines or scheduled society events.
 
 Settings beside Add event opens the iCal subscription form. HTTP, HTTPS and
 webcal links are supported; a blank link disconnects the timetable. Settings
-are saved in the mock database separately for each signed-in user, and feed
+are saved in the backend separately for each signed-in user, and feed
 errors are displayed explicitly.
-The existing `/api/ics-proxy` endpoint runs in the Vite development server;
-a production deployment needs an equivalent server-side endpoint.
-Add event creates personal events shared with Home. They are saved in the mock
-database for the signed-in user.
+Feeds load through a proxy (the Vite `/api/ics-proxy` in development, the
+backend's `/v1/calendar/ics` when hosted; see *Hosting on AWS*).
+Add event creates personal events shared with Home. They are saved in the
+backend for the signed-in user.
 Click a day number to view its agenda or an event to view its details.
 Event details open in an adjacent non-modal card: to the right on Monday
 through Wednesday and to the left on Thursday through Sunday. On small screens

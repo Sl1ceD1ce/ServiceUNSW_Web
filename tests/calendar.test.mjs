@@ -19,7 +19,7 @@ before(async () => {
   ;({ parseIcs, getDayOccurrences } = await server.ssrLoadModule('/src/calendar/events.ts'))
   ;({ default: Home } = await server.ssrLoadModule('/src/pages/Home.tsx'))
   ;({ default: Calendar } = await server.ssrLoadModule('/src/pages/Calendar.tsx'))
-  users = Object.values(JSON.parse(await readFile(new URL('../server/seed/users.json', import.meta.url), 'utf8')))
+  users = Object.values(JSON.parse(await readFile(new URL('../src/data/users.json', import.meta.url), 'utf8')))
   ;({ getEventDetailsPosition } = await server.ssrLoadModule('/src/calendar/eventDetailsPosition.ts'))
 })
 

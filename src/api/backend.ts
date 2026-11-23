@@ -1,5 +1,5 @@
-// Client for the ServiceUNSW backend (`/v1`), which owns accounts, sign-in and
-// email verification.
+// Client for the ServiceUNSW backend (`/v1`), which owns accounts, sign-in,
+// email verification and each account's saved portal data.
 //
 // Hosted (S3 + CloudFront, see ServiceUNSW-infra): the publisher writes
 // `/runtime-config.json` with `apiBaseUrl`, and requests go straight to API
@@ -116,6 +116,53 @@ export async function fetchMe(token: string): Promise<BackendUser> {
     throw new BackendError(500, 'The ServiceUNSW service returned invalid account details.')
   }
   return value as unknown as BackendUser
+}
+
+/**
+ * Fetches an iCal feed through the backend's `/calendar/ics` proxy, which
+ * blocks private addresses and only returns iCalendar content.
+ */
+export async function fetchCalendarFeed(token: string, url: string): Promise<string> {
+  let response: Response
+  try {
+    response = await fetch(`${await resolveApiBase()}/calendar/ics?url=${encodeURIComponent(url)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+  } catch {
+    throw new BackendError(0, 'Unable to reach the ServiceUNSW service. Check your connection and try again.')
+  }
+  if (response.ok) return response.text()
+  const body: unknown = await response.json().catch(() => null)
+  // The backend hides 5xx details, so name the likely cause here.
+  const message = response.status >= 500
+    ? 'The calendar server could not be reached or took too long. Try again later.'
+    : isRecord(body) && typeof body.error === 'string' ? body.error : fallbackMessage(response.status)
+  throw new BackendError(response.status, message)
+}
+
+// Per-account key-value store (`/v1/users/me/data`). Values are any JSON; the
+// backend stores each as a string column, so see userData.ts for size limits.
+
+/** Returns every stored key for the signed-in account. */
+export async function fetchUserData(token: string): Promise<Record<string, unknown>> {
+  const value = await call('/users/me/data', { token })
+  if (!isRecord(value)) throw new BackendError(500, 'The ServiceUNSW service returned invalid saved data.')
+  return value
+}
+
+/** Creates or replaces the given keys in one transaction. */
+export async function patchUserData(token: string, values: Record<string, unknown>): Promise<void> {
+  await call('/users/me/data', { method: 'PATCH', body: values, token })
+}
+
+/** Deletes one key; a key that is already gone is not an error. */
+export async function deleteUserData(token: string, key: string): Promise<void> {
+  try {
+    await call(`/users/me/data?key=${encodeURIComponent(key)}`, { method: 'DELETE', token })
+  } catch (error) {
+    if (!(error instanceof BackendError && error.status === 404)) throw error
+  }
 }
 
 export const PASSWORD_RULES: { test: (password: string) => boolean; label: string }[] = [

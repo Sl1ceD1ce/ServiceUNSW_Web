@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { readUserRecord, writeUserRecord } from '../api/mockDatabase'
+import { readUserRecord, writeUserRecord } from '../api/portalData'
 import { parseFavourites } from '../models/favourites'
 
 export function useFavourites(userId: string) {
@@ -23,7 +23,7 @@ export function useFavourites(userId: string) {
             ids: [],
             loading: false,
             saving: false,
-            error: 'Unable to load your favourites from the mock database. Refresh the page and try again.',
+            error: 'Unable to load your favourites from your ServiceUNSW account. Refresh the page and try again.',
           })
         }
       })
@@ -41,7 +41,7 @@ export function useFavourites(userId: string) {
       setState((previous) => ({
         ...previous,
         saving: false,
-        error: 'Unable to save favourites to the mock database. Try again.',
+        error: 'Unable to save favourites to your ServiceUNSW account. Try again.',
       }))
       return false
     }

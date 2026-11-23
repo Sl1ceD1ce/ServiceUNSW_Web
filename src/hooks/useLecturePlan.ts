@@ -1,29 +1,16 @@
-import { useEffect, useState } from 'react'
-import { fetchLecturePlan } from '../api/mockDatabase'
+import { useMemo } from 'react'
+import { getLecturePlan } from '../api/portalData'
 import type { LecturePlan } from '../models/lectures'
+import type { User } from '../models/users'
 
-export function useLecturePlan(userId: string) {
-  const [state, setState] = useState<LecturePlan & { loading: boolean; error: string }>({
-    courses: [],
-    sessions: [],
-    loading: true,
-    error: '',
-  })
-
-  useEffect(() => {
-    let cancelled = false
-    fetchLecturePlan(userId)
-      .then((plan) => {
-        if (!cancelled) setState({ ...plan, loading: false, error: '' })
-      })
-      .catch((error: unknown) => {
-        console.error('Unable to load lecture plan:', error)
-        if (!cancelled) {
-          setState({ courses: [], sessions: [], loading: false, error: 'Unable to load your lecture plan. Refresh the page and try again.' })
-        }
-      })
-    return () => { cancelled = true }
-  }, [userId])
-
-  return state
+/** The lecture schedule is bundled with the app, so it is ready immediately. */
+export function useLecturePlan(user: User): LecturePlan & { loading: boolean; error: string } {
+  return useMemo(() => {
+    try {
+      return { ...getLecturePlan(user), loading: false, error: '' }
+    } catch (error) {
+      console.error('Unable to load lecture plan:', error)
+      return { courses: [], sessions: [], loading: false, error: 'Unable to load your lecture plan. Refresh the page and try again.' }
+    }
+  }, [user])
 }

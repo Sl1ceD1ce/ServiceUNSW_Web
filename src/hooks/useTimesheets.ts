@@ -4,10 +4,11 @@ import {
   deleteTimesheetEntry,
   fetchTimesheets,
   updateTimesheetEntry,
-} from '../api/mockDatabase'
+} from '../api/portalData'
 import type { TimesheetEntryInput, Timesheets } from '../models/timesheets'
+import type { User } from '../models/users'
 
-export function useTimesheets(userId: string) {
+export function useTimesheets(user: User) {
   const [data, setData] = useState<Timesheets | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -16,19 +17,19 @@ export function useTimesheets(userId: string) {
 
   useEffect(() => {
     let cancelled = false
-    fetchTimesheets(userId)
+    fetchTimesheets(user)
       .then((timesheets) => {
         if (!cancelled) setData(timesheets)
       })
       .catch((fetchError: unknown) => {
         console.error('Unable to load timesheets:', fetchError)
-        if (!cancelled) setLoadError('Unable to load your timesheets from the mock database. Refresh the page and try again.')
+        if (!cancelled) setLoadError('Unable to load your timesheets from your ServiceUNSW account. Refresh the page and try again.')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [userId])
+  }, [user])
 
   async function run(action: () => Promise<Timesheets>): Promise<boolean> {
     if (saving) return false
@@ -53,10 +54,10 @@ export function useTimesheets(userId: string) {
     saving,
     error,
     clearError: () => setError(''),
-    createEntry: (entry: TimesheetEntryInput, submit = false) => run(() => createTimesheetEntry(userId, entry, submit)),
+    createEntry: (entry: TimesheetEntryInput, submit = false) => run(() => createTimesheetEntry(user, entry, submit)),
     updateEntry: (entryId: string, entry: TimesheetEntryInput, submit = false) =>
-      run(() => updateTimesheetEntry(userId, entryId, entry, submit)),
-    deleteEntry: (entryId: string) => run(() => deleteTimesheetEntry(userId, entryId)),
+      run(() => updateTimesheetEntry(user, entryId, entry, submit)),
+    deleteEntry: (entryId: string) => run(() => deleteTimesheetEntry(user, entryId)),
   }
 }
 

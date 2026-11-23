@@ -10,7 +10,7 @@ import TeachingNote from '../components/TeachingNote'
 import './Lectures.css'
 
 function Lectures({ user }: { user: User }) {
-  const plan = useLecturePlan(user.id)
+  const plan = useLecturePlan(user)
   const { courses, sessions } = plan
   const checklistsState = useLectureChecklists(user.id)
   const [newItems, setNewItems] = useState<Record<string, string>>({})

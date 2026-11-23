@@ -1,12 +1,5 @@
-import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
-import { mockApiPlugin } from './server/mockApi.ts'
-
-const mockDatabase = {
-  seedDirectory: fileURLToPath(new URL('./server/seed', import.meta.url)),
-  dataDirectory: fileURLToPath(new URL('./.mockdb', import.meta.url)),
-}
 
 // Fetches remote .ics calendars server-side so the browser never has to make
 // a cross-origin request (which calendar providers typically block via CORS).
@@ -57,7 +50,8 @@ function icsProxyPlugin(): Plugin {
   }
 }
 
-// The ServiceUNSW backend handles accounts, sign-in and email verification.
+// The ServiceUNSW backend handles accounts, sign-in, email verification and
+// each account's saved portal data.
 // By default the dev server proxies `/v1` to the Development deployment on AWS;
 // set SERVICEUNSW_API_URL (e.g. in .env.local) to use a local backend instead.
 // Hosted builds don't use this proxy: they read /runtime-config.json.
@@ -70,12 +64,9 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const backendUrl = env.SERVICEUNSW_API_URL || 'https://api.dev.serviceunsw.com'
   return {
-    plugins: [react(), icsProxyPlugin(), mockApiPlugin(mockDatabase)],
+    plugins: [react(), icsProxyPlugin()],
     server: {
       proxy: backendProxy(backendUrl),
-      watch: {
-        ignored: ['**/.mockdb/**'],
-      },
     },
     preview: {
       proxy: backendProxy(backendUrl),

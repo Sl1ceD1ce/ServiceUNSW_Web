@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { readUserRecord, writeUserRecord } from '../api/mockDatabase'
+import { readUserRecord, writeUserRecord } from '../api/portalData'
 import { parseLectureChecklists } from '../models/lectures'
 import type { LectureChecklists } from '../models/lectures'
 
@@ -34,7 +34,7 @@ export function useLectureChecklists(userId: string) {
             loading: false,
             saving: false,
             loadFailed: true,
-            error: 'Unable to load lecture checklists from the mock database. Refresh the page and try again.',
+            error: 'Unable to load lecture checklists from your ServiceUNSW account. Refresh the page and try again.',
           })
         }
       })
@@ -53,7 +53,7 @@ export function useLectureChecklists(userId: string) {
       setState((previous) => ({
         ...previous,
         saving: false,
-        error: 'Unable to save lecture checklist changes to the mock database. Try again.',
+        error: 'Unable to save lecture checklist changes to your ServiceUNSW account. Try again.',
       }))
       return false
     }

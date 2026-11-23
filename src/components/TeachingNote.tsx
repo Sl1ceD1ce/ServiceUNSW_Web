@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { SubmitEvent } from 'react'
-import { readUserRecord, writeUserRecord } from '../api/mockDatabase'
+import { readUserRecord, writeUserRecord } from '../api/portalData'
 
 function parseTeachingNote(value: unknown): string {
   if (value === null) return ''
   if (typeof value !== 'object' || Array.isArray(value) || !('note' in value) || typeof value.note !== 'string') {
-    throw new Error('Teaching note returned by the mock API is invalid.')
+    throw new Error('Teaching note saved in your account is invalid.')
   }
   return value.note
 }
@@ -31,7 +31,7 @@ function TeachingNote({ userId }: { userId: string }) {
             loading: false,
             saving: false,
             loadFailed: true,
-            error: 'Unable to load your teaching note from the mock database. Refresh the page and try again.',
+            error: 'Unable to load your teaching note from your ServiceUNSW account. Refresh the page and try again.',
           })
         }
       })

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { BackendError, fetchMe } from './api/backend'
-import { linkProfile } from './api/mockDatabase'
+import { linkProfile } from './api/portalData'
 import { clearSession, readSessionToken, saveSessionToken } from './auth/session'
 import type { User } from './models/users'
 import { useCalendarData } from './calendar/useCalendarData'
@@ -97,9 +97,9 @@ function App() {
 }
 
 function Portal({ user, onSignOut }: { user: User; onSignOut: () => void }) {
-  const calendar = useCalendarData(user.id)
+  const calendar = useCalendarData(user)
   const favourites = useFavourites(user.id)
-  const catalogue = useServices(user.id)
+  const catalogue = useServices(user)
   return (
     <div className="app-layout">
       <Sidebar user={user} />
