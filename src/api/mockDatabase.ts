@@ -3,6 +3,7 @@ import type { LecturePlan, LectureWeekday } from '../models/lectures'
 import type { ServiceCatalogue } from '../models/services'
 import type { TimesheetEntryInput, Timesheets } from '../models/timesheets'
 import type { User } from '../models/users'
+import type { BackendUser } from './backend'
 
 export type MockResource =
   | 'favourites'
@@ -56,8 +57,9 @@ function parseUser(value: unknown): User {
   return value as unknown as User
 }
 
-export async function signIn(zid: string, zPass: string): Promise<User> {
-  return parseUser(await sendJson('/api/auth/sign-in', 'POST', { zid, zPass }))
+/** Returns the portal profile for an account the backend has signed in. */
+export async function linkProfile(account: BackendUser): Promise<User> {
+  return parseUser(await sendJson('/api/profiles', 'POST', account))
 }
 
 export async function fetchUser(userId: string): Promise<User> {

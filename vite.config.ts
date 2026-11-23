@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import { mockApiPlugin } from './server/mockApi.ts'
 
 const mockDatabase = {
@@ -57,12 +57,28 @@ function icsProxyPlugin(): Plugin {
   }
 }
 
+// The ServiceUNSW backend handles accounts, sign-in and email verification.
+// By default the dev server proxies `/v1` to the Development deployment on AWS;
+// set SERVICEUNSW_API_URL (e.g. in .env.local) to use a local backend instead.
+// Hosted builds don't use this proxy: they read /runtime-config.json.
+function backendProxy(target: string) {
+  return { '/v1': { target, changeOrigin: true, secure: true } }
+}
+
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), icsProxyPlugin(), mockApiPlugin(mockDatabase)],
-  server: {
-    watch: {
-      ignored: ['**/.mockdb/**'],
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const backendUrl = env.SERVICEUNSW_API_URL || 'https://api.dev.serviceunsw.com'
+  return {
+    plugins: [react(), icsProxyPlugin(), mockApiPlugin(mockDatabase)],
+    server: {
+      proxy: backendProxy(backendUrl),
+      watch: {
+        ignored: ['**/.mockdb/**'],
+      },
     },
-  },
+    preview: {
+      proxy: backendProxy(backendUrl),
+    },
+  }
 })

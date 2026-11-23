@@ -36,8 +36,9 @@ This prints a local URL (usually `http://localhost:5173`) — open it in your br
 
 ## Mock database
 
-The app never reads data files directly. Pages call a simulated API
-(`/api/auth/sign-in` and `/api/users/:userId/...`) served by
+Accounts and sign-in use the real backend (see *Sign-in and email
+verification*). Portal data still comes from a simulated API
+(`/api/profiles` and `/api/users/:userId/...`) served by
 [server/mockApi.ts](server/mockApi.ts) inside the Vite dev and preview servers.
 
 - `server/seed/` — committed starting data (users, services, lecture schedule,
@@ -61,8 +62,8 @@ server/
   seed/                # Committed starting data for the mock database
 src/
   App.tsx              # Route definitions
-  api/                 # Client functions for the simulated API
-  auth/                # Demo sign-in session helpers
+  api/                 # Backend client (backend.ts) and simulated API client
+  auth/                # JWT and pending-registration session storage
   calendar/            # Shared event parsing, recurrence and state
   components/          # Shared UI components (Sidebar, ...)
   hooks/               # API-backed state (favourites, services, lectures, timesheets)
@@ -102,12 +103,37 @@ new tab. The profile page is read-only and has a Sign out button.
 Teaching tool names describe role access; those tools are not yet implemented
 in this workspace.
 
-### Demo sign-in
+### Sign-in and email verification
 
-The `/sign-in` page requires a test zID and zPass. Every sample user's zPass is
-`Password` (case-sensitive), stored with their record in the mock database:
+Accounts live in the ServiceUNSW backend (`/Users/jason/UniStuff/ServiceUNSW`,
+API under `/v1`), not in the mock database. [src/api/backend.ts](src/api/backend.ts)
+is the client; [src/pages/SignIn.tsx](src/pages/SignIn.tsx) has three views:
 
-| User | zID | Type |
+1. **Sign in** posts `{zId, password}` to `/v1/auth/login` and receives a JWT.
+   A 403 means the account is unverified: if this tab has that zID's pending
+   registration it opens the verify view, otherwise it asks the user to register
+   again (the backend allows re-registering an unverified zID after 60 seconds).
+2. **Create an account** posts zID, name, date of birth (ms), degree and a
+   password (14+ characters with upper, lower and a number) to
+   `/v1/auth/register`. The backend emails a six-digit code to
+   `<zID>@ad.unsw.edu.au` and returns an opaque `registrationToken`.
+3. **Verify your email** posts `{zId, registrationToken, verificationCode}` to
+   `/v1/auth/register/verify` and receives a JWT. **Send a new code** calls
+   `/v1/auth/register/resend` (60-second cooldown; earlier codes stop working).
+   Codes expire after 10 minutes or five wrong attempts.
+
+The JWT and pending registration (zID, token, send time) are kept in
+sessionStorage, so a refresh keeps them and closing the tab ends them. Passwords
+and codes are never stored. On load the app calls `/v1/users/me`; a 401/403
+clears the token and returns to sign-in. Sign out clears the token.
+
+After sign-in the browser posts the `/users/me` details to the mock
+`POST /api/profiles`, which returns the portal profile used by every other page.
+A zID matching a seeded profile (below) keeps that profile's roles and teaching
+appointments; any other zID gets a new student profile. Names and degree come
+from the backend.
+
+| Seeded profile | zID | Roles |
 | --- | --- | --- |
 | Peter | z2460811 | Student |
 | Alex | z2460812 | Tutor |
@@ -115,16 +141,20 @@ The `/sign-in` page requires a test zID and zPass. Every sample user's zPass is
 | Sam | z2460814 | Tutor, Professor |
 | Taylor | z2460815 | Tutor, Student |
 
-Portal routes require sign-in. The mock API checks the zID and zPass and never
-returns the password. The signed-in user's ID is stored in browser session
-storage so refreshing the tab keeps the session; the entered password is never
-stored there. Sign out on the profile page clears the session and
-returns to sign-in. The profile and sidebar update to the selected user's roles.
+**Which backend.** `npm run dev` proxies `/v1` to the AWS Development
+deployment, `https://api.dev.serviceunsw.com`. To use a local backend instead,
+create `.env.local` containing `SERVICEUNSW_API_URL=http://127.0.0.1:3000`.
+The local backend must listen on `0.0.0.0` when it runs in Docker. A hosted
+build (S3 + CloudFront, see ServiceUNSW-infra) reads `apiBaseUrl` from
+`/runtime-config.json` and calls API Gateway directly with a bearer token.
 
-This is demo authentication only, not a security boundary or a
-connection to UNSW authentication. Test passwords are public fixtures; never
-enter real credentials. Production authentication requires a trusted backend
-or university identity provider.
+**Development email limits.** Development SES is in the sandbox, so codes only
+reach recipients verified in ServiceUNSW-infra (`sesSandboxRecipients`).
+Registering any other zID gets 503 "Email delivery failed". Per-recipient and
+per-IP send limits apply (see the backend's `docs/registration-verification.md`).
+
+This is for demonstration only: it is not UNSW identity. The profile bridge
+trusts the browser and checks no JWT, and the other portal data is still mock.
 
 ### Home
 
